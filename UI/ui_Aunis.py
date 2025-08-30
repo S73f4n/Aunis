@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'Aunis.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.8.1
+## Created by: Qt User Interface Compiler version 6.9.1
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -58,6 +58,12 @@ class Ui_Aunis(object):
         self.scripting_Stop = QPushButton(self.tab)
         self.scripting_Stop.setObjectName(u"scripting_Stop")
         self.scripting_Stop.setGeometry(QRect(260, 260, 75, 24))
+        self.scripting_Status = QLineEdit(self.tab)
+        self.scripting_Status.setObjectName(u"scripting_Status")
+        self.scripting_Status.setEnabled(False)
+        self.scripting_Status.setGeometry(QRect(10, 260, 131, 21))
+        self.scripting_Status.setFont(font)
+        self.scripting_Status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.tabWidget.addTab(self.tab, "")
         self.tab_2 = QWidget()
         self.tab_2.setObjectName(u"tab_2")
@@ -263,11 +269,11 @@ class Ui_Aunis(object):
         self.status_Feedback.setGeometry(QRect(80, 140, 91, 24))
         palette = QPalette()
         brush = QBrush(QColor(255, 255, 255, 107))
-        brush.setStyle(Qt.SolidPattern)
-        palette.setBrush(QPalette.Disabled, QPalette.Button, brush)
+        brush.setStyle(Qt.BrushStyle.SolidPattern)
+        palette.setBrush(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Button, brush)
         brush1 = QBrush(QColor(255, 255, 255, 135))
-        brush1.setStyle(Qt.SolidPattern)
-        palette.setBrush(QPalette.Disabled, QPalette.ButtonText, brush1)
+        brush1.setStyle(Qt.BrushStyle.SolidPattern)
+        palette.setBrush(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, brush1)
         self.status_Feedback.setPalette(palette)
         self.status_Feedback.setFont(font)
         self.status_Refresh = QPushButton(self.groupBox_2)
@@ -314,7 +320,7 @@ class Ui_Aunis(object):
     # setupUi
 
     def retranslateUi(self, Aunis):
-        Aunis.setWindowTitle(QCoreApplication.translate("Aunis", u"Aunis - Nanonis Control & Scripting Interface", None))
+        Aunis.setWindowTitle(QCoreApplication.translate("Aunis", u"Aunis - Nanonis Scripting Interface", None))
         self.menuAboutHelp.setText(QCoreApplication.translate("Aunis", u"About", None))
         self.menuManualHelp.setText(QCoreApplication.translate("Aunis", u"Manual", None))
         self.menuSaveFile.setText(QCoreApplication.translate("Aunis", u"Save", None))

@@ -1,0 +1,8 @@
+bias.Set 0.1
+
+loop 10
+scan.Start
+scan.Wait
+bias.Add 0.1
+wait 10
+end

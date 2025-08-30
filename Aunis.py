@@ -3,59 +3,58 @@
 import os
 import sys
 import time
-
 import numpy as np
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtWidgets import QApplication, QMainWindow
-
-from PyNanonis import NanonisInterface
-
+from Scripting import ScriptingInterface, TCP_INTERFACES
 from UI.ui_Aunis import Ui_Aunis
 
 class runScriptThread(QtCore.QThread):
-    logSignal = QtCore.Signal(str, str)
+    logSignal = QtCore.Signal(str, str, str)
+    errorMsg = QtCore.Signal(str)
+    scriptStatus = QtCore.Signal(str)
 
     def __init__(self):
         super(runScriptThread, self).__init__()
         self.script = ''
         self.cancelScript = False
         self.nni = None
-
-    def run(self):
+    
+    def run(self): 
         """Executes the commands one after the other.
-        Non-nested loops are also possible.
-        """        
-        repeat_counter = 0
-        repeat_startindex = 0
-        repeat_loop = False
+        Nested loops are also possible.
+        """            
         script = self.script
-        all_cmds = script.split('\n')
-        index = 0
-        while index < len(all_cmds) and self.cancelScript == False:
-            cmdLine = all_cmds[index]
-            if len(cmdLine) > 1:
-                cmd = cmdLine.split(' ')
-                cmdAlias = cmd[0]
-                cmdArgs = cmd[1:]
-                if cmdAlias == 'repeat':
-                    repeat_counter = np.int(cmdArgs[0])
-                    repeat_loop = True
-                    repeat_startindex = index
-                elif cmdAlias == 'end' and repeat_loop == True:
-                    if repeat_counter == 0:
-                        repeat_loop = False
-                        repeat_startindex = 0
-                    else:
-                        repeat_counter -= 1
-                        if repeat_counter > 0:
-                            index = repeat_startindex
+        commands, errors = self.nni.parse_commands(script)
+        if errors:
+            msg = "SYNTAX ERRORS:\n"
+            for e in errors:
+                msg += e + "\n"
+            self.errorMsg.emit(msg)
+            self.scriptStatus.emit('Syntax errors')
+        else:
+            self.execute(commands)
+
+    def execute(self, commands):
+        """
+        Executes parsed commands.
+        """
+        self.scriptStatus.emit('Running')
+        for entry in commands:
+            if self.cancelScript == False:
+                cmd = entry["cmd"]
+                func = entry["func"]
+                args = entry["args"]
+                errorString, response, variables = func(*args)
+                if(len(errorString) != 0):
+                    status = errorString
                 else:
-                    self.logSignal.emit('Request', cmdLine)
-                    err, resp = self.nni.command(cmdAlias, cmdArgs)
-                    if len(resp) > 0:
-                        self.logSignal.emit('Response', str(resp)) 
-                    print(cmdLine)      
-            index += 1
+                    status = "OK"
+                self.logSignal.emit('Request', cmd + ' ' + ' '.join(str(x) for x in args), status)
+                if len(variables) > 0:
+                    self.logSignal.emit('Response', '[' + ", ".join(str(x) for x in variables) + "]", "")
+        self.scriptStatus.emit('Finished')
+        
 
 class AunisUI(QMainWindow):
     def __init__(self):
@@ -67,6 +66,8 @@ class AunisUI(QMainWindow):
         self.cancelScript = False
         self.threadScript = runScriptThread()
         self.threadScript.logSignal.connect(self.logCommand)
+        self.threadScript.errorMsg.connect(self.showErrorMessage)
+        self.threadScript.scriptStatus.connect(self.updateScriptingStatus)
 
         self.log_folder = 'logs'
         self.log_date = time.strftime('%Y-%m-%d %H%M%S', time.localtime())
@@ -101,7 +102,7 @@ class AunisUI(QMainWindow):
     def startUp(self):
         """Initializes the Nanonis Interface.
         """        
-        self.nni = NanonisInterface()
+        self.nni = ScriptingInterface()
         self.loadExternalInterfaces()
         self.updateStatus()
 
@@ -130,22 +131,29 @@ class AunisUI(QMainWindow):
         else:
             self.uiAu.status_Status.setText('Disonnected')
             self.uiAu.status_Status.setStyleSheet('color: rgb(0,0,0); background-color: rgb(237,51,59);')
+    
+    @QtCore.Slot(str)
+    def updateScriptingStatus(self, status):
+        self.uiAu.scripting_Status.setText(status)
 
     @QtCore.Slot(str, str)
-    def logCommand(self, msgType, message):
+    def logCommand(self, msgType, message, status):
         """Saves an executed command and/or response message into a log file.
 
         Args:
             msgType (str): Request or Response
             message (str): Message text.
-        """        
+        """
+        if not os.path.exists(self.log_folder):
+            os.mkdir(self.log_folder)
+
         directory = os.path.join(self.log_folder, self.log_date)
         if not os.path.exists(directory):
             os.mkdir(directory)
         
         timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
         log = os.path.join(directory, '{}.log'.format('cmds'))
-        data = '{}\t{}\t{}\n'.format(timestamp, msgType, message)
+        data = '{}\t{}\t{}\t{}\n'.format(timestamp, msgType, message, status)
 
         cursor = QtGui.QTextCursor(self.uiAu.status_Log.document())
         cursor.setPosition(0)
@@ -157,34 +165,35 @@ class AunisUI(QMainWindow):
 
     def getSetpoint(self):
         """Reads out and displays the setpoint values.
-        """        
-        err, resp = self.nni.command("getCurrent", [])
-        I = resp['Z-Controller setpoint'] / 1e-12
-        err, resp = self.nni.command("getBias", [])
-        V = resp['Bias value (V)'] / 1e-3
+        """
+        errorString, response, variables = self.nni.execute("current.Get")
+        I = variables[0] / 1e-12
+        errorString, response, variables = self.nni.execute("bias.Get")
+        V = variables[0] / 1e-3
         setpoint = '{:.2f} pA; {:.2f} mV'.format(I, V)
         self.uiAu.status_Setpoint.setText(setpoint)
 
     def switchFBOnOff(self):
         """Switches the feedback on or off.
         """        
-        err, resp = self.nni.command("getFeedback", [])
-        fbStatus = resp["Z-Controller status"]
+        errorString, response, variables = self.nni.execute("fb.Get")   
+        fbStatus = variables[0]
         if fbStatus == 0:
-            err, resp = self.nni.command("setFeedback", [1])
+            errorString, response, variables = self.nni.execute("fb.Set 1")
         if fbStatus == 1:
-            err, resp = self.nni.command("setFeedback", [0])
+            errorString, response, variables = self.nni.execute("fb.Set 0")
         time.sleep(1)
         self.getFBStatus()
     
     def getFBStatus(self):
         """Reads out and displays the feedback status.
         """        
-        err, resp = self.nni.command("getFeedback", [])
-        if resp["Z-Controller status"] == 0:
+        errorString, response, variables = self.nni.execute("fb.Get")        
+        fbStatus = variables[0]
+        if fbStatus == 0:
             self.uiAu.status_Feedback.setText('Off')
             self.uiAu.status_Feedback.setStyleSheet('color: rgb(0,0,0); background-color: rgb(237,51,59);')
-        if resp["Z-Controller status"] == 1:
+        if fbStatus == 1:
             self.uiAu.status_Feedback.setText('On')
             self.uiAu.status_Feedback.setStyleSheet('color: rgb(0,0,0); background-color: rgb(51,209,122);')
 
@@ -201,59 +210,59 @@ class AunisUI(QMainWindow):
         """        
         if self.threadScript.isRunning():
             self.threadScript.cancelScript = True
+            self.updateScriptingStatus('Stopping...')
     
     def moveTipXplus(self):
         """Moves the tip in X+ direction by the specified amount.
         """        
         dx = self.uiAu.tipman_dx.value() * 1e-10
-        err, resp = self.nni.command("addX", [dx])
+        self.nni.addX(dx)
 
     def moveTipXminus(self):
         """Moves the tip in X- direction by the specified amount.
         """        
         dx = (-1) * self.uiAu.tipman_dx.value() * 1e-10
-        err, resp = self.nni.command("addX", [dx])
+        self.nni.addX(dx)
     
     def moveTipYplus(self):
         """Moves the tip in Y+ direction by the specified amount.
         """        
         dy = self.uiAu.tipman_dy.value() * 1e-10
-        err, resp = self.nni.command("addY", [dy])
+        self.nni.addY(dy)
 
     def moveTipYminus(self):
         """Moves the tip in Y- direction by the specified amount.
         """        
         dy = (-1) * self.uiAu.tipman_dy.value() * 1e-10
-        err, resp = self.nni.command("addY", [dy])
+        self.nni.addY(dy)
 
     def moveTipZplus(self):
         """Moves the tip in Z+ direction by the specified amount.
         """        
         dz = self.uiAu.tipman_dz.value() * 1e-10
-        err, resp = self.nni.command("addZ", [dz])
+        self.nni.addZ(dz)
 
     def moveTipZminus(self):
         """Moves the tip in Z- direction by the specified amount.
         """        
         dz = (-1) * self.uiAu.tipman_dz.value() * 1e-10
-        err, resp = self.nni.command("addZ", [dz])
+        self.nni.addZ(dz)
 
     def loadExternalInterfaces(self):
         """Loads and displays all external TCP interfaces.
         """        
-        interfaces = self.nni.getExternalInterfaces()
+        for index, (key, value) in enumerate(TCP_INTERFACES.items()):
+            item = QtWidgets.QTableWidgetItem(str(key))
+            item.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.uiAu.external_Interfaces.setItem(index, 0, item)
+            item = QtWidgets.QTableWidgetItem(str(value['host']))
+            item.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.uiAu.external_Interfaces.setItem(index, 1, item)
+            item = QtWidgets.QTableWidgetItem(str(value['port']))
+            item.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.uiAu.external_Interfaces.setItem(index, 2, item)
 
-        for counter, intf in enumerate(interfaces):
-            item = QtWidgets.QTableWidgetItem(intf['Name'])
-            item.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.uiAu.external_Interfaces.setItem(counter, 0, item)
-            item = QtWidgets.QTableWidgetItem(intf['IP-Adress'])
-            item.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.uiAu.external_Interfaces.setItem(counter, 1, item)
-            item = QtWidgets.QTableWidgetItem(str(intf['Port']))
-            item.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.uiAu.external_Interfaces.setItem(counter, 2, item)
-
+    @QtCore.Slot(str)
     def showErrorMessage(self, msg):
         """Displays a message box with an error text.
 
@@ -263,7 +272,6 @@ class AunisUI(QMainWindow):
         msgbox = QtWidgets.QMessageBox()
         msgbox.setWindowIcon(QtGui.QIcon(self.fileIcon))
         msgbox.setWindowTitle('Information')
-        msgbox.setIcon(QtWidgets.QMessageBox.information)
         msgbox.setText(msg)
         msgbox.exec()
 
@@ -296,8 +304,8 @@ class AunisUI(QMainWindow):
         os.startfile('manual\\manual.pdf')
     
     def aboutMessage(self):
-        msg = 'Aunis - Nanonis Control & Scripting Interface\n\n'
-        msg += 'Version 0.32 (04.05.2025)\n\n'
+        msg = 'Aunis - Nanonis Scripting Interface\n\n'
+        msg += 'Version 0.41 (28.08.2025)\n\n'
         msg += '© 2022-2025 Taner Esat'
         msgbox = QtWidgets.QMessageBox()
         msgbox.setWindowIcon(QtGui.QIcon(self.fileIcon))

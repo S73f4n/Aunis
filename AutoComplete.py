@@ -5,13 +5,12 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QTextCursor
 from PySide6.QtWidgets import QCompleter, QPlainTextEdit
 
-from PyNanonis import NanonisInterface
-import config as cfg
+from Scripting import ScriptingInterface
 
 class TextEditAutoComplete(QPlainTextEdit):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.nni = NanonisInterface()
+        self.nni = ScriptingInterface()
         completer = QCompleter(self.getCmdList())
         completer.activated.connect(self.insert_completion)
         completer.setWidget(self)
@@ -21,19 +20,10 @@ class TextEditAutoComplete(QPlainTextEdit):
         self.textChanged.connect(self.complete)
 
     def getCmdList(self):
-        cmds = ['repeat', 'end']
+        cmds = ['loop', 'end']
         self.commandList = self.nni.commandList
-        self.specialCommandList = self.nni.loadCommandList(cfg.JSON_SPECIALCMD)
-        self.externalInterfacesCommandLists = self.nni.loadExternalInterfaceCommandLists(cfg.FOLDER_EXTCMD)
         for cmd in self.commandList.keys():
             cmds.append(cmd)
-        for cmd in self.specialCommandList.keys():
-            cmds.append(cmd)
-        if len(self.externalInterfacesCommandLists) > 0:
-            for interfaceCmds in self.externalInterfacesCommandLists:
-                for cmd in interfaceCmds.keys():
-                    if cmd != 'Interface':           
-                        cmds.append(cmd)
         return cmds
 
     def insert_completion(self, completion):
