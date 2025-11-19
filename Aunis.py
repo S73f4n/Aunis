@@ -78,7 +78,7 @@ class AunisUI(QMainWindow):
     def updateUI(self):
         """Sets up the user interface.
         """ 
-        self.fileIcon = 'UI\\Aunis.svg'
+        self.fileIcon = os.path.join(os.path.dirname(__file__),"UI","Aunis.svg")
         self.setWindowIcon(QtGui.QIcon(self.fileIcon))
 
         # app.aboutToQuit.connect(self.closeEvent)   
