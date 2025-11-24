@@ -184,13 +184,9 @@ This command is based on a custom, self-implemented function.
 ```
 #### Adding a Remote Command
 
-All external devices are defined in the **TCP_INTERFACES** dictionary.
-```python
-TCP_INTERFACES = {
-    "QuPe": {"host": "192.168.1.10", "port": 1337},
-}
-```
-**Multiple TCP interfaces** can be managed via **TCP_INTERFACES**. Each remote command specifies which interface to use.
+All external devices are defined in settings.json and can be changed via the GUI (restart requirec).
+
+**Multiple TCP interfaces** can be managed. Each remote command specifies which interface to use.
 
 The **TCPClient class** handles communication. It has two methods:
 1.	**send(command, args)**
