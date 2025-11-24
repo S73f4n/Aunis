@@ -2,20 +2,17 @@
 
 import socket
 import time
+import json
 import numpy as np
 import nanonis_spm
 from scipy.optimize import curve_fit
 
 # -------------------------------
-# TCP INTERFACES
+# Read TCP INTERFACES from file
 # -------------------------------
-"""
-Define all TCP remote interfaces here.
-Key: interface name (used to reference remote devices)
-Value: dict with 'host' and 'port'
-    host → IP address of the remote device.
-    port → TCP port where the device is listening.
-"""
+with open('settings.json', 'r') as f:
+   TCP_INTERFACES = json.load(f)["TCP_INTERFACES"]
+
 
 # -------------------------------
 # TCP Client Class
@@ -28,9 +25,12 @@ class TCPClient:
     - send: fire-and-forget
     - query: send and wait for response
     """
-    def __init__(self, host: str, port: int):
-        self.host = host
-        self.port = port
+    def __init__(self, interface_name: str):
+        if interface_name not in TCP_INTERFACES:
+            raise ValueError(f"Unknown interface: {interface_name}")
+        self.host = TCP_INTERFACES[interface_name]["host"]
+        self.port = TCP_INTERFACES[interface_name]["port"]
+
 
     def query(self, command_name: str, args: list):
         """Sends a command with arguments to the remote device and waits for response.
