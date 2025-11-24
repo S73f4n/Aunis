@@ -487,6 +487,18 @@ FUNCTION_REGISTRY = {
             "End value (V)": {"type": np.float32, "default": 1.0, "user": True},
         },
     },
+    "biasSpec.ProbsSet": {
+        "func": nanonis_spm.Nanonis.BiasSpectr_PropsSet,
+        "args": {
+            "Save all": {"type": np.uint16, "default": 0, "user": True},
+            "Number of sweeps": {"type": np.int32, "default": 0, "user": True},
+            "Backward sweeps": {"type": np.uint16, "default": 0, "user": True},
+            "Number of points": {"type": np.int32, "default": 0, "user": True},
+            "Z offset (m)": {"type": np.float32, "default": 0, "user": False},
+            "Autosave": {"type": np.uint16, "default": 0, "user": False},
+            "Show save dialog": {"type": np.uint16, "default": 0, "user": False}
+        },
+    },
     "scan.Start": {
         "func": nanonis_spm.Nanonis.Scan_Action,
         "args": {
