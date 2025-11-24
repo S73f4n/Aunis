@@ -4,9 +4,10 @@ import os
 import sys
 import time
 import numpy as np
+import json
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtWidgets import QApplication, QMainWindow
-from Scripting import ScriptingInterface, TCP_INTERFACES
+from Scripting import ScriptingInterface 
 from UI.ui_Aunis import Ui_Aunis
 
 class runScriptThread(QtCore.QThread):
@@ -103,7 +104,10 @@ class AunisUI(QMainWindow):
         """Initializes the Nanonis Interface.
         """        
         self.nni = ScriptingInterface()
+        self.readSettings()
         self.loadExternalInterfaces()
+        self.uiAu.settings_NanonisIP.setText(self.SETTINGS['NANONIS_HOST']['ip'])
+        self.uiAu.settings_NanonisPort.setText(str(self.SETTINGS['NANONIS_HOST']['port']))
         self.updateStatus()
 
     def connect(self):
@@ -111,6 +115,8 @@ class AunisUI(QMainWindow):
         """        
         ip = self.uiAu.settings_NanonisIP.text()
         port = np.int64(self.uiAu.settings_NanonisPort.text())
+        self.SETTINGS['NANONIS_HOST']['ip'] = ip
+        self.SETTINGS['NANONIS_HOST']['port'] = int(port)
         self.connected = self.nni.connect(ip, port)
         self.updateStatus()
     
@@ -131,6 +137,18 @@ class AunisUI(QMainWindow):
         else:
             self.uiAu.status_Status.setText('Disonnected')
             self.uiAu.status_Status.setStyleSheet('color: rgb(0,0,0); background-color: rgb(237,51,59);')
+            
+    def readSettings(self):
+        """Read settings from settings.json into self.SETTINGS
+        """
+        with open('settings.json', 'r') as f:
+            self.SETTINGS = json.load(f)
+    
+    def writeSettings(self):
+        """Writes settings from self.SETTINGS into settings.json
+        """
+        with open('settings.json', 'w') as f:
+            json.dump(self.SETTINGS,f)
     
     @QtCore.Slot(str)
     def updateScriptingStatus(self, status):
@@ -251,7 +269,7 @@ class AunisUI(QMainWindow):
     def loadExternalInterfaces(self):
         """Loads and displays all external TCP interfaces.
         """        
-        for index, (key, value) in enumerate(TCP_INTERFACES.items()):
+        for index, (key, value) in enumerate(self.SETTINGS["TCP_INTERFACES"].items()):
             item = QtWidgets.QTableWidgetItem(str(key))
             item.setTextAlignment(QtCore.Qt.AlignCenter)
             self.uiAu.external_Interfaces.setItem(index, 0, item)
@@ -261,6 +279,23 @@ class AunisUI(QMainWindow):
             item = QtWidgets.QTableWidgetItem(str(value['port']))
             item.setTextAlignment(QtCore.Qt.AlignCenter)
             self.uiAu.external_Interfaces.setItem(index, 2, item)
+    
+    def readExternalInterfaces(self):
+        """Read external TCP interfaces from UI
+        """
+        dataFromUi = {}
+        rows = self.uiAu.external_Interfaces.rowCount()
+        for r in range(rows):
+            key = self.uiAu.external_Interfaces.item(r, 0).text().strip()
+            if not key:
+                continue
+
+            host = self.uiAu.external_Interfaces.item(r, 1).text().strip()
+            port = self.uiAu.external_Interfaces.item(r, 2).text().strip()
+            if not host or not port:
+                continue
+            dataFromUi.update({key: {"host": host, "port": int(port)}})
+        self.SETTINGS["TCP_INTERFACES"] = dataFromUi
 
     @QtCore.Slot(str)
     def showErrorMessage(self, msg):
@@ -321,6 +356,8 @@ class AunisUI(QMainWindow):
             self.stopScript()
         except:
             pass
+        self.readExternalInterfaces()
+        self.writeSettings()
         return super().closeEvent(event)
 
 if __name__ == '__main__':

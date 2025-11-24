@@ -1,0 +1,12 @@
+{
+    "NANONIS_HOST": {
+        "ip": "127.0.0.1",
+        "port": 6501
+    },
+    "TCP_INTERFACES": {
+        "QuPe": {
+            "host": "192.168.1.10",
+            "port": 1337
+        }
+    }
+}
